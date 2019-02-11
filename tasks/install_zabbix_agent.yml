@@ -1,0 +1,48 @@
+---
+- name: Install zabbix-agent
+  yum:
+    name: zabbix-agent
+    state: latest
+
+- name: Install smartmontools
+  yum:
+    name: smartmontools
+    state: latest
+
+- name: Install libselinux-python
+  yum:
+    name: libselinux-python
+    state: latest
+  when: ansible_selinux != False
+
+- name: Set zabbix_agent config
+  template:
+    src: zabbix_agentd.conf.j2
+    dest: /etc/zabbix/zabbix_agentd.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart zabbix-agent
+
+- name: Copy scripts
+  copy:
+    src: scripts/smartctl-disks-discovery.pl
+    dest: /etc/zabbix/scripts/
+    mode: u+x
+    owner: zabbix
+    group: zabbix
+
+- name: Allow 'zabbix' to have passwordless sudo
+  lineinfile:
+    dest: /etc/sudoers
+    state: present
+    insertafter: 'wheel'
+    regexp: '^zabbix'
+    line: 'zabbix ALL=(ALL) NOPASSWD:/usr/sbin/smartctl,/etc/zabbix/scripts/smartctl-disks-discovery.pl'
+    validate: 'visudo -cf %s'
+
+- name: Start and Enable Instaled Services
+  service:
+    enabled: yes
+    state: started
+    name: zabbix-agent
